@@ -1,5 +1,4 @@
 use std::cmp::Ordering;
-use std::convert::TryFrom;
 use std::f64::consts::PI;
 use thiserror::*;
 
@@ -17,7 +16,7 @@ fn sign_pow(value: f64, exp: f64) -> f64 {
 }
 
 fn linear_to_srgb(value: f64) -> usize {
-    let v = f64::max(0f64, f64::min(1f64, value));
+    let v = value.clamp(0f64, 1f64);
     if v <= 0.003_130_8 {
         (v * 12.92 * 255f64 + 0.5) as usize
     } else {
@@ -92,7 +91,7 @@ pub fn encode(
 
     let mut hash = String::new();
 
-    let size_flag = ((cx - 1) + (cy - 1) * 9);
+    let size_flag = (cx - 1) + (cy - 1) * 9;
     hash += &encode_base83_string(size_flag, 1);
 
     let maximum_value: f64;
@@ -172,31 +171,13 @@ fn encode_dc(value: [f64; 3]) -> usize {
     let rounded_r = linear_to_srgb(value[0]);
     let rounded_g = linear_to_srgb(value[1]);
     let rounded_b = linear_to_srgb(value[2]);
-    ((rounded_r << 16) + (rounded_g << 8) + rounded_b)
+    (rounded_r << 16) + (rounded_g << 8) + rounded_b
 }
 
 fn encode_ac(value: [f64; 3], maximum_value: f64) -> usize {
-    let quant_r = f64::floor(f64::max(
-        0f64,
-        f64::min(
-            18f64,
-            f64::floor(sign_pow(value[0] / maximum_value, 0.5) * 9f64 + 9.5),
-        ),
-    ));
-    let quant_g = f64::floor(f64::max(
-        0f64,
-        f64::min(
-            18f64,
-            f64::floor(sign_pow(value[1] / maximum_value, 0.5) * 9f64 + 9.5),
-        ),
-    ));
-    let quant_b = f64::floor(f64::max(
-        0f64,
-        f64::min(
-            18f64,
-            f64::floor(sign_pow(value[2] / maximum_value, 0.5) * 9f64 + 9.5),
-        ),
-    ));
+    let quant_r = f64::floor(sign_pow(value[0] / maximum_value, 0.5) * 9f64 + 9.5).clamp(0f64, 18f64);
+    let quant_g = f64::floor(sign_pow(value[1] / maximum_value, 0.5) * 9f64 + 9.5).clamp(0f64, 18f64);
+    let quant_b = f64::floor(sign_pow(value[2] / maximum_value, 0.5) * 9f64 + 9.5).clamp(0f64, 18f64);
 
     (quant_r * 19f64 * 19f64 + quant_g * 19f64 + quant_b) as usize
 }
@@ -220,4 +201,3 @@ fn encode_base83_string(value: usize, length: u32) -> String {
         .map(|digit| ENCODE_CHARACTERS[digit])
         .collect()
 }
-
